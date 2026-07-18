@@ -1,6 +1,6 @@
 # Placidity's SFS Utilities
 
-A utility site for [Spaceflight Simulator](https://www.spaceflightsimulator.app/) by Stef Morojna.
+A utility site for [Spaceflight Simulator](https://teamcuriosity.com) by Stef Morojna.
 
 
 ## Features
