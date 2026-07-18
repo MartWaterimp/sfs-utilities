@@ -1,8 +1,12 @@
 /* Fuel calculator for Placidity's SFS Utilities */
 (function () {
-  const COOKIE_KEY = "placidity_sfs_fuels_v1";
+  const COOKIE_KEY = "placidity_sfs_fuels_v2";
   const COOKIE_DAYS = 400;
 
+  // SFS 1x1 tank: 2.25 t propellant + 0.25 t dry = fuel:dry 9:1
+  const DRY_OVER_PROPELLANT = 1 / 9;
+
+  // Density is stored as kg/m^3. Mass outputs stay in SFS tons (t).
   const DEFAULT_FUELS = [
     {
       id: "hydrolox",
@@ -10,9 +14,8 @@
       description: "Liquid hydrogen with liquid oxygen. Light and efficient, but it takes up a lot of space.",
       oxidizer: 6.0,
       fuel: 1.0,
-      density: 0.361,
-      M: 0.1260,
-      dryFraction: 0.12
+      density: 361,
+      M: 0.1260
     },
     {
       id: "methalox",
@@ -20,9 +23,8 @@
       description: "Liquid methane with liquid oxygen. A balanced option for most builds.",
       oxidizer: 3.6,
       fuel: 1.0,
-      density: 0.833,
-      M: 0.2908,
-      dryFraction: 0.10
+      density: 833,
+      M: 0.2908
     },
     {
       id: "kerolox",
@@ -30,9 +32,8 @@
       description: "Kerosene with liquid oxygen. Dense and compact, good when volume is tight.",
       oxidizer: 2.56,
       fuel: 1.0,
-      density: 1.024,
-      M: 0.3574,
-      dryFraction: 0.09
+      density: 1024,
+      M: 0.3574
     },
     {
       id: "hypergolic",
@@ -40,9 +41,18 @@
       description: "Storable hypergolics. Dense, reliable, and ready without deep cryogenics.",
       oxidizer: 2.6,
       fuel: 1.0,
-      density: 1.173,
-      M: 0.4095,
-      dryFraction: 0.09
+      density: 1173,
+      M: 0.4095
+    },
+    {
+      id: "apcp",
+      name: "APCP",
+      description: "Ammonium perchlorate composite propellant. Solid motor grain, dense and self-contained.",
+      oxidizer: 0,
+      fuel: 1.0,
+      density: 1750,
+      M: 0.6108,
+      solid: true
     }
   ];
 
@@ -63,15 +73,21 @@
   }
 
   function normalizeFuel(fuel) {
+    let density = toNumber(fuel.density, 1000);
+    // Migrate old t/m^3 values if someone still has them hanging around
+    if (density > 0 && density < 20) {
+      density = density * 1000;
+    }
+
     return {
       id: String(fuel.id || `custom-${Date.now()}`),
       name: String(fuel.name || "Untitled fuel").trim() || "Untitled fuel",
       description: String(fuel.description || "").trim(),
-      oxidizer: toNumber(fuel.oxidizer, 1),
+      oxidizer: toNumber(fuel.oxidizer, 0),
       fuel: toNumber(fuel.fuel, 1),
-      density: toNumber(fuel.density, 1),
+      density: density,
       M: toNumber(fuel.M, 0.3),
-      dryFraction: Math.max(0, toNumber(fuel.dryFraction, 0.1))
+      solid: Boolean(fuel.solid) || toNumber(fuel.oxidizer, 0) === 0
     };
   }
 
@@ -80,7 +96,8 @@
     return Number.isFinite(n) ? n : fallback;
   }
 
-  function formatRatio(oxidizer, fuel) {
+  function formatRatio(oxidizer, fuel, solid) {
+    if (solid || toNumber(oxidizer, 0) === 0) return "solid";
     const o = toNumber(oxidizer, NaN);
     const f = toNumber(fuel, NaN);
     if (!Number.isFinite(o) || !Number.isFinite(f) || f === 0) return "-";
@@ -92,26 +109,26 @@
   }
 
   function calcTank(width, height, fuel) {
-    const density = toNumber(fuel.density, 0);
+    const densityKg = toNumber(fuel.density, 0);
+    const densityTons = densityKg / 1000;
     const M = toNumber(fuel.M, 0);
-    const dryFraction = Math.max(0, toNumber(fuel.dryFraction, 0));
     const k = width * M;
     const bpHeight = height * k;
     const bpY = k > 0 ? 1 / k : 0;
     const volume = Math.PI * Math.pow(width / 2, 2) * height;
-    const propellantMass = volume * density;
-    const dryMass = propellantMass * dryFraction;
+    const propellantMass = volume * densityTons;
+    const dryMass = propellantMass * DRY_OVER_PROPELLANT;
     const totalMass = propellantMass + dryMass;
     return { k, bpHeight, bpY, volume, propellantMass, dryMass, totalMass };
   }
 
   function escapeHtml(value) {
     return String(value)
-      .replace(/&/g, '\x26amp;')
-      .replace(/</g, '\x26lt;')
-      .replace(/>/g, '\x26gt;')
-      .replace(/"/g, '\x26quot;')
-      .replace(/'/g, '&#39;');
+      .replace(/&/g, "\x26amp;")
+      .replace(/</g, "\x26lt;")
+      .replace(/>/g, "\x26gt;")
+      .replace(/"/g, "\x26quot;")
+      .replace(/'/g, "&#39;");
   }
 
   function init() {
@@ -126,7 +143,6 @@
     const dialogTitle = document.getElementById("fuel-dialog-title");
     const form = document.getElementById("fuel-form");
     const cancelBtn = document.getElementById("fuel-cancel-btn");
-    const saveBtn = document.getElementById("fuel-save-btn");
 
     if (!widthInput || !heightInput || !fuelGrid || !overviewList) return;
 
@@ -147,9 +163,9 @@
       form.description.value = fuel ? fuel.description : "";
       form.oxidizer.value = fuel ? fuel.oxidizer : 2.5;
       form.fuel.value = fuel ? fuel.fuel : 1;
-      form.density.value = fuel ? fuel.density : 1;
+      form.density.value = fuel ? fuel.density : 1000;
       form.M.value = fuel ? fuel.M : 0.35;
-      form.dryFraction.value = fuel ? fuel.dryFraction : 0.1;
+      form.solid.checked = fuel ? Boolean(fuel.solid || fuel.oxidizer === 0) : false;
       updateRatioPreview();
       dialog.classList.add("open");
       dialog.setAttribute("aria-hidden", "false");
@@ -165,7 +181,8 @@
     function updateRatioPreview() {
       const preview = document.getElementById("ratio-preview");
       if (!preview) return;
-      preview.textContent = formatRatio(form.oxidizer.value, form.fuel.value);
+      const solid = form.solid && form.solid.checked;
+      preview.textContent = formatRatio(form.oxidizer.value, form.fuel.value, solid);
     }
 
     function render() {
@@ -182,7 +199,8 @@
       emptyState.hidden = true;
       fuelGrid.innerHTML = fuels.map((fuel) => {
         const stats = calcTank(width, height, fuel);
-        const ratio = formatRatio(fuel.oxidizer, fuel.fuel);
+        const ratio = formatRatio(fuel.oxidizer, fuel.fuel, fuel.solid);
+        const ratioLabel = ratio === "solid" ? "solid" : `${escapeHtml(ratio)} O:F`;
         return `
           <article class="card fuel-card" data-id="${escapeHtml(fuel.id)}">
             <div class="toolbar" style="margin-bottom: 8px;">
@@ -190,12 +208,12 @@
                 <h3>${escapeHtml(fuel.name)}</h3>
                 <p class="muted">${escapeHtml(fuel.description || "Custom propellant mix.")}</p>
               </div>
-              <span class="chip primary">${escapeHtml(ratio)} O:F</span>
+              <span class="chip primary">${ratioLabel}</span>
             </div>
             <div class="chip-row">
-              <span class="chip outline">Density ${toNumber(fuel.density, 0).toFixed(3)} t/m3</span>
+              <span class="chip outline">Density ${toNumber(fuel.density, 0).toFixed(0)} kg/m<sup>3</sup></span>
               <span class="chip outline">M ${toNumber(fuel.M, 0).toFixed(4)}</span>
-              <span class="chip outline">Dry fraction ${(toNumber(fuel.dryFraction, 0) * 100).toFixed(1)}%</span>
+              <span class="chip outline">Fuel:dry 9:1</span>
             </div>
             <hr class="divider" />
             <p class="section-copy" style="margin-bottom: 8px;"><strong>Mass breakdown</strong></p>
@@ -203,7 +221,7 @@
               <div class="stat-row"><span>Propellant (wet)</span><strong>${stats.propellantMass.toFixed(3)} t</strong></div>
               <div class="stat-row"><span>Dry mass (structure)</span><strong>${stats.dryMass.toFixed(3)} t</strong></div>
               <div class="stat-row total"><span>Total mass</span><strong>${stats.totalMass.toFixed(3)} t</strong></div>
-              <div class="stat-row muted"><span>Tank volume</span><span>${stats.volume.toFixed(3)} m3</span></div>
+              <div class="stat-row muted"><span>Tank volume</span><span>${stats.volume.toFixed(3)} m<sup>3</sup></span></div>
             </div>
             <hr class="divider" />
             <p class="section-copy" style="margin-bottom: 8px;"><strong>Blueprint values for SFS</strong></p>
@@ -263,18 +281,22 @@
     });
     form.oxidizer.addEventListener("input", updateRatioPreview);
     form.fuel.addEventListener("input", updateRatioPreview);
+    if (form.solid) {
+      form.solid.addEventListener("change", updateRatioPreview);
+    }
 
     form.addEventListener("submit", (event) => {
       event.preventDefault();
+      const solid = form.solid ? form.solid.checked : false;
       const draft = normalizeFuel({
         id: editingId || `custom-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         name: form.name.value,
         description: form.description.value,
-        oxidizer: form.oxidizer.value,
+        oxidizer: solid ? 0 : form.oxidizer.value,
         fuel: form.fuel.value,
         density: form.density.value,
         M: form.M.value,
-        dryFraction: form.dryFraction.value
+        solid: solid
       });
 
       if (!draft.name) {

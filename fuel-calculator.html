@@ -44,7 +44,7 @@
         <div>
           <h2 class="section-title" style="margin-bottom: 4px;">Propellants</h2>
           <p class="section-copy" style="margin: 0;">
-            Dry mass is listed for every fuel type using each mix's dry mass fraction.
+            Dry mass is fixed at fuel:dry 9:1 for every fuel, matching SFS tanks (2.25 t fuel + 0.25 t dry on a 1x1).
           </p>
         </div>
         <div class="button-row">
@@ -68,8 +68,8 @@
     </section>
 
     <p class="muted" style="margin-top: 20px; font-size: 12px;">
-      Tip: dry mass fraction is structure mass divided by propellant mass. Edit any fuel to change the ratio,
-      density, M constant, or that fraction. Cookie storage lasts about a year unless you clear site data.
+      Tip: dry mass is always propellant mass ÷ 9 (fuel:dry 9:1). Densities use kg/m<sup>3</sup>.
+      Cookie storage lasts about a year unless you clear site data.
     </p>
   </main>
 
@@ -88,9 +88,15 @@
             <label for="fuel-description">Short description</label>
             <textarea id="fuel-description" name="description" placeholder="What makes this mix special?"></textarea>
           </div>
+          <div class="field" style="grid-column: 1 / -1;">
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+              <input id="fuel-solid" name="solid" type="checkbox" />
+              Solid propellant (no O:F ratio)
+            </label>
+          </div>
           <div class="field">
             <label for="fuel-oxidizer">Oxidizer parts</label>
-            <input id="fuel-oxidizer" name="oxidizer" type="number" step="0.01" value="2.5" required />
+            <input id="fuel-oxidizer" name="oxidizer" type="number" step="0.01" value="2.5" />
             <span class="hint">Left side of the O:F ratio</span>
           </div>
           <div class="field">
@@ -102,9 +108,9 @@
             <span class="hint">Mixture ratio preview: <strong id="ratio-preview">2.5:1</strong> (oxidizer : fuel)</span>
           </div>
           <div class="field">
-            <label for="fuel-density">Density (t/m3)</label>
-            <input id="fuel-density" name="density" type="number" step="0.001" value="1" required />
-            <span class="hint">Bulk density of the mixed propellant</span>
+            <label for="fuel-density">Density (kg/m<sup>3</sup>)</label>
+            <input id="fuel-density" name="density" type="number" step="1" value="1000" required />
+            <span class="hint">Bulk density of the propellant</span>
           </div>
           <div class="field">
             <label for="fuel-m">Mass constant (M)</label>
@@ -112,9 +118,7 @@
             <span class="hint">Used for SFS blueprint mass scaling</span>
           </div>
           <div class="field" style="grid-column: 1 / -1;">
-            <label for="fuel-dry">Dry mass fraction</label>
-            <input id="fuel-dry" name="dryFraction" type="number" min="0" step="0.01" value="0.1" required />
-            <span class="hint">Tank structure as a fraction of propellant mass (0.10 = 10%)</span>
+            <span class="hint">Dry mass is locked to fuel:dry 9:1 for all fuels (SFS tank rule).</span>
           </div>
         </div>
         <div class="dialog-actions">
